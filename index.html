@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HubWater Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3"></script>
+  </head>
+  <body class="bg-gray-100">
+    <div class="container mx-auto p-8">
+      <h1 class="text-4xl font-bold text-center mb-8">HubWater Dashboard</h1>
+
+      <!-- Contatori -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div class="bg-white shadow-lg rounded-lg p-6 text-center">
+          <h2 class="text-xl font-semibold text-gray-700">Totale acqua erogata</h2>
+          <p class="text-5xl font-bold text-blue-600 mt-4">
+            <span id="flow-meter-count">0</span> L
+          </p>
+        </div>
+
+        <div class="bg-white shadow-lg rounded-lg p-6 text-center">
+          <h2 class="text-xl font-semibold text-gray-700">Acqua naturale ambiente</h2>
+          <p class="text-5xl font-bold text-green-600 mt-4">
+            <span id="water-type-0">0</span> L
+          </p>
+        </div>
+
+        <div class="bg-white shadow-lg rounded-lg p-6 text-center">
+          <h2 class="text-xl font-semibold text-gray-700">Acqua naturale fredda</h2>
+          <p class="text-5xl font-bold text-purple-600 mt-4">
+            <span id="water-type-1">0</span> L
+          </p>
+        </div>
+
+        <div class="bg-white shadow-lg rounded-lg p-6 text-center">
+          <h2 class="text-xl font-semibold text-gray-700">Acqua frizzante</h2>
+          <p class="text-5xl font-bold text-red-600 mt-4">
+            <span id="water-type-2">0</span> L
+          </p>
+        </div>
+      </div>
+
+      <!-- Grafico e box a griglia 2x2 accanto al grafico -->
+      <div class="mt-12 grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Grafico FLOW METER COUNT occupa metà dello spazio -->
+        <div class="bg-white shadow-lg rounded-lg p-6 lg:col-span-2" style="height: 400px; max-width: 100%;">
+          <div class="w-full h-full">
+            <canvas id="flowMeterChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Nuovi box ridotti in dimensione, ma non compressi -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-8 lg:grid-cols-1">
+          <div class="bg-white shadow-lg rounded-lg p-4 text-center">
+            <h2 class="text-lg font-semibold text-gray-700">Plastica evitata</h2>
+            <p class="text-4xl font-bold text-yellow-600 mt-4">
+              <span id="plastic-avoided">0</span> kg
+            </p>
+          </div>
+
+          <div class="bg-white shadow-lg rounded-lg p-4 text-center">
+            <h2 class="text-lg font-semibold text-gray-700">CO2 non emessa</h2>
+            <p class="text-4xl font-bold text-gray-600 mt-4">
+              <span id="co2-saved">0</span> kg
+            </p>
+          </div>
+
+          <div class="bg-white shadow-lg rounded-lg p-4 text-center">
+            <h2 class="text-lg font-semibold text-gray-700">Footprint</h2>
+            <p class="text-4xl font-bold text-blue-600 mt-4">
+              <span id="footprint">0</span> m²
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      // Recupera lo stato corrente dal server quando il client si carica
+      window.onload = function() {
+        fetch('/current-state')
+          .then(response => response.json())
+          .then(data => {
+            // Aggiorna i contatori della dashboard con i dati recuperati
+            document.getElementById('flow-meter-count').textContent = data.totalFlowMeterCount.toFixed(2);
+            document.getElementById('water-type-0').textContent = data.waterTypeCounts[0].toFixed(2);
+            document.getElementById('water-type-1').textContent = data.waterTypeCounts[1].toFixed(2);
+            document.getElementById('water-type-2').textContent = data.waterTypeCounts[2].toFixed(2);
+            
+            plasticAvoided += data.totalFlowMeterCount * 0.04; // Supponiamo che 1 litro eviti 0.03 kg di plastica
+            co2Saved += data.totalFlowMeterCount * 0.2; // Supponiamo che 1 litro risparmi 0.05 kg di CO2
+            footprint += data.totalFlowMeterCount * 0.1; // Supponiamo che 1 litro impatti 0.1 m²
+
+            document.getElementById('plastic-avoided').textContent = plasticAvoided.toFixed(2);
+            document.getElementById('co2-saved').textContent = co2Saved.toFixed(2);
+            document.getElementById('footprint').textContent = footprint.toFixed(2);
+
+
+            // Inizializza i grafici con i dati recuperati
+            totalFlowMeterCount = data.totalFlowMeterCount;
+            waterTypeCounts = data.waterTypeCounts;
+          })
+          .catch(error => console.error('Errore nel recupero dello stato:', error));
+
+
+          fetch('/flow-data')
+          .then(response => response.json())
+          .then(flowData => {
+            flowData.forEach(item => {
+              flowMeterChart.data.labels.push(new Date(item.timestamp));
+              flowMeterChart.data.datasets[0].data.push(item.totalFlowMeterCount);
+            });
+            flowMeterChart.update();
+          })
+          .catch(error => console.error('Errore nel recupero dei dati del grafico:', error));
+      };
+
+
+      var socket = io();
+
+      // Chart.js setup
+      var flowMeterCtx = document.getElementById('flowMeterChart').getContext('2d');
+
+      // Dati iniziali per i grafici
+      var flowMeterData = {
+        labels: [], // timestamps
+        datasets: [{
+          label: 'Totale Acqua erogata (L)',
+          borderColor: 'blue',
+          backgroundColor: 'rgba(0, 0, 255, 0.1)',
+          data: [] // valori del flow meter
+        }]
+      };
+
+      var flowMeterChart = new Chart(flowMeterCtx, {
+        type: 'line',
+        data: flowMeterData,
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: { type: 'time', time: { unit: 'minute' } },
+            y: { beginAtZero: true }
+          }
+        }
+      });
+
+      // Inizializza i contatori locali
+      var totalFlowMeterCount = 0;
+      var waterTypeCounts = { 0: 0, 1: 0, 2: 0 };
+      var plasticAvoided = 0;
+      var co2Saved = 0;
+      var moneySaved = 0;
+      var footprint = 0;
+
+      // Listen for telemetry updates
+      socket.on('telemetry update', function(msg) {
+        var eventData = msg.HUBWATER_EVENT;
+
+        var flowMeterCount = parseFloat(eventData.STAT.FLOW_METER_COUNT);
+        var liters = flowMeterCount / 695;
+        var waterType = parseInt(eventData.EROG.WATER_TYPE);
+        var currentTime = new Date();
+
+        // Aggiorna i valori
+        totalFlowMeterCount += liters;
+        document.getElementById('flow-meter-count').textContent = parseFloat(totalFlowMeterCount).toFixed(2);
+
+        if (waterTypeCounts.hasOwnProperty(waterType)) {
+          waterTypeCounts[waterType] += liters;
+          document.getElementById('water-type-' + waterType).textContent = parseFloat(waterTypeCounts[waterType]).toFixed(2);
+        }
+
+        // Calcoli aggiuntivi per i nuovi contatori
+        plasticAvoided += liters * 0.04; // Supponiamo che 1 litro eviti 0.03 kg di plastica
+        co2Saved += liters * 0.2; // Supponiamo che 1 litro risparmi 0.05 kg di CO2
+        footprint += liters * 0.1; // Supponiamo che 1 litro impatti 0.1 m²
+
+        document.getElementById('plastic-avoided').textContent = plasticAvoided.toFixed(2);
+        document.getElementById('co2-saved').textContent = co2Saved.toFixed(2);
+        document.getElementById('footprint').textContent = footprint.toFixed(2);
+
+        // Aggiorna i grafici
+        flowMeterChart.data.labels.push(currentTime);
+        flowMeterChart.data.datasets[0].data.push(totalFlowMeterCount);
+        flowMeterChart.update();
+      });
+    </script>
+  </body>
+</html>
