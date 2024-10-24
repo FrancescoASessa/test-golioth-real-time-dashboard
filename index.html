@@ -69,9 +69,9 @@
           </div>
 
           <div class="bg-white shadow-lg rounded-lg p-4 text-center">
-            <h2 class="text-lg font-semibold text-gray-700">Footprint</h2>
+            <h2 class="text-lg font-semibold text-gray-700">Water Footprint</h2>
             <p class="text-4xl font-bold text-blue-600 mt-4">
-              <span id="footprint">0</span> m²
+              <span id="footprint">0</span> L
             </p>
           </div>
         </div>
@@ -140,7 +140,7 @@
             
             plasticAvoided += data.totalFlowMeterCount * 0.04;
             co2Saved += data.totalFlowMeterCount * 0.2;
-            footprint += data.totalFlowMeterCount * 0.1;
+            footprint += plasticAvoided * 2.2;
 
             document.getElementById('plastic-avoided').textContent = plasticAvoided.toFixed(2);
             document.getElementById('co2-saved').textContent = co2Saved.toFixed(2);
@@ -225,7 +225,7 @@
         // Calcoli aggiuntivi per i nuovi contatori
         plasticAvoided += liters * 0.04;
         co2Saved += liters * 0.2;
-        footprint += liters * 0.1;
+        footprint += plasticAvoided * 2.2;
 
         document.getElementById('plastic-avoided').textContent = plasticAvoided.toFixed(2);
         document.getElementById('co2-saved').textContent = co2Saved.toFixed(2);
