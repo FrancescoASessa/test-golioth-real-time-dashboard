@@ -11,6 +11,7 @@ app.use(express.json());
 let totalFlowMeterCount = 0;
 let waterTypeCounts = { 0: 0, 1: 0, 2: 0 };
 let flowData = [];
+let deviceData = {};
 
 // Route per ottenere i valori correnti
 app.get('/current-state', (req, res) => {
@@ -24,6 +25,10 @@ app.get('/flow-data', (req, res) => {
   res.json(flowData);
 });
 
+app.get('/device-data', (req, res) => {
+  res.json(deviceData);
+});
+
 app.post('/telemetry', (req, res) => {
   console.log(req.body);
 
@@ -31,6 +36,8 @@ app.post('/telemetry', (req, res) => {
   const flowMeterCount = parseFloat(eventData.STAT.FLOW_METER_COUNT);
   const liters = flowMeterCount / 695;
   const timestamp = new Date(); 
+  const devId = eventData.DEV_ID;
+  const coldWaterTemp = eventData.STAT.COLD_WATER_TEMP;
   const waterType = parseInt(eventData.EROG.WATER_TYPE);
 
   // Aggiorna i contatori sul server
@@ -40,6 +47,13 @@ app.post('/telemetry', (req, res) => {
   }
 
   flowData.push({ timestamp: timestamp, totalFlowMeterCount });
+
+  if (!deviceData[devId]) {
+    deviceData[devId] = { totalFlow: 0, lastColdWaterTemp: 0 };
+  }
+  deviceData[devId].totalFlow += liters;
+  deviceData[devId].lastColdWaterTemp = coldWaterTemp;
+
 
   // Emitti i dati aggiornati ai client
   io.emit('telemetry update', req.body);

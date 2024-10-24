@@ -76,10 +76,57 @@
           </div>
         </div>
       </div>
+
+      <!-- Griglia delle card dinamiche -->
+      <div id="device-cards" class="mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+        <!-- Le card verranno generate dinamicamente tramite JavaScript -->
+      </div>
+
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
+      // Assegna colori in base alla temperatura
+      function getColorByTemperature(temp) {
+        if (temp < 10) return 'text-blue-600'; // Temperature basse
+        if (temp >= 10 && temp <= 25) return 'text-green-600'; // Temperature moderate
+        return 'text-red-600'; // Temperature alte
+      }
+
+      function updateOrCreateCard(devId, temp) {
+  const deviceCardsContainer = document.getElementById('device-cards');
+  let card = document.getElementById(`device-${devId}`);
+
+  // Se la card esiste, aggiorna i valori
+  if (card) {
+    const tempElement = card.querySelector('.temperature');
+    const colorClass = getColorByTemperature(temp);
+    tempElement.className = `text-6xl font-bold mt-4 temperature ${colorClass}`;
+    tempElement.innerHTML = `${temp}<span class="text-4xl">°C</span>`;
+  } else {
+    // Se la card non esiste, creane una nuova
+    card = document.createElement('div');
+    card.id = `device-${devId}`;
+    card.className = 'bg-white shadow-lg rounded-xl p-6 text-center transition duration-500';
+
+    // Aggiungi ID del dispositivo
+    let deviceIdElement = document.createElement('h2');
+    deviceIdElement.className = 'text-xl font-semibold text-gray-700';
+    deviceIdElement.textContent = `Dispositivo ID: ${devId}`;
+    card.appendChild(deviceIdElement);
+
+    // Aggiungi temperatura con colore dinamico
+    const colorClass = getColorByTemperature(temp);
+    let tempElement = document.createElement('p');
+    tempElement.className = `text-6xl font-bold mt-4 temperature ${colorClass}`;
+    tempElement.innerHTML = `${temp}<span class="text-4xl">°C</span>`;
+    card.appendChild(tempElement);
+
+    // Aggiungi la card al contenitore
+    deviceCardsContainer.appendChild(card);
+  }
+}
+
       // Recupera lo stato corrente dal server quando il client si carica
       window.onload = function() {
         fetch('/current-state')
@@ -91,32 +138,27 @@
             document.getElementById('water-type-1').textContent = data.waterTypeCounts[1].toFixed(2);
             document.getElementById('water-type-2').textContent = data.waterTypeCounts[2].toFixed(2);
             
-            plasticAvoided += data.totalFlowMeterCount * 0.04; // Supponiamo che 1 litro eviti 0.03 kg di plastica
-            co2Saved += data.totalFlowMeterCount * 0.2; // Supponiamo che 1 litro risparmi 0.05 kg di CO2
-            footprint += data.totalFlowMeterCount * 0.1; // Supponiamo che 1 litro impatti 0.1 m²
+            plasticAvoided += data.totalFlowMeterCount * 0.04;
+            co2Saved += data.totalFlowMeterCount * 0.2;
+            footprint += data.totalFlowMeterCount * 0.1;
 
             document.getElementById('plastic-avoided').textContent = plasticAvoided.toFixed(2);
             document.getElementById('co2-saved').textContent = co2Saved.toFixed(2);
             document.getElementById('footprint').textContent = footprint.toFixed(2);
-
-
-            // Inizializza i grafici con i dati recuperati
-            totalFlowMeterCount = data.totalFlowMeterCount;
-            waterTypeCounts = data.waterTypeCounts;
           })
           .catch(error => console.error('Errore nel recupero dello stato:', error));
 
+        // Ottiene i dati di ogni dispositivo
+        fetch('/device-data')
+    .then(response => response.json())
+    .then(deviceData => {
+      Object.keys(deviceData).forEach(devId => {
+        const temp = deviceData[devId].lastColdWaterTemp;
+        updateOrCreateCard(devId, temp);
+      });
+    })
+    .catch(error => console.error('Errore nel recupero dei dati del dispositivo:', error));
 
-          fetch('/flow-data')
-          .then(response => response.json())
-          .then(flowData => {
-            flowData.forEach(item => {
-              flowMeterChart.data.labels.push(new Date(item.timestamp));
-              flowMeterChart.data.datasets[0].data.push(item.totalFlowMeterCount);
-            });
-            flowMeterChart.update();
-          })
-          .catch(error => console.error('Errore nel recupero dei dati del grafico:', error));
       };
 
 
@@ -165,6 +207,8 @@
         var liters = flowMeterCount / 695;
         var waterType = parseInt(eventData.EROG.WATER_TYPE);
         var currentTime = new Date();
+        var devId = eventData.DEV_ID;
+        var coldWaterTemp = eventData.STAT.COLD_WATER_TEMP;
 
         // Aggiorna i valori
         totalFlowMeterCount += liters;
@@ -176,9 +220,9 @@
         }
 
         // Calcoli aggiuntivi per i nuovi contatori
-        plasticAvoided += liters * 0.04; // Supponiamo che 1 litro eviti 0.03 kg di plastica
-        co2Saved += liters * 0.2; // Supponiamo che 1 litro risparmi 0.05 kg di CO2
-        footprint += liters * 0.1; // Supponiamo che 1 litro impatti 0.1 m²
+        plasticAvoided += liters * 0.04;
+        co2Saved += liters * 0.2;
+        footprint += liters * 0.1;
 
         document.getElementById('plastic-avoided').textContent = plasticAvoided.toFixed(2);
         document.getElementById('co2-saved').textContent = co2Saved.toFixed(2);
@@ -188,6 +232,9 @@
         flowMeterChart.data.labels.push(currentTime);
         flowMeterChart.data.datasets[0].data.push(totalFlowMeterCount);
         flowMeterChart.update();
+
+
+        updateOrCreateCard(devId, coldWaterTemp);
       });
     </script>
   </body>
