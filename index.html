@@ -162,7 +162,10 @@
       };
 
 
-      var socket = io();
+      var socket = io({
+        transports: ['websocket'], // Prefer WebSocket over polling
+        upgrade: false
+      });
 
       // Chart.js setup
       var flowMeterCtx = document.getElementById('flowMeterChart').getContext('2d');
