@@ -32,7 +32,7 @@ app.get('/device-data', (req, res) => {
 app.post('/telemetry', (req, res) => {
   console.log(req.body);
 
-  const eventData = req.body.HUBWATER_EVENT;
+  const eventData = req.body.data.HUBWATER_EVENT;
   const flowMeterCount = parseFloat(eventData.STAT.FLOW_METER_COUNT);
   const liters = flowMeterCount / 695;
   const timestamp = new Date(); 
