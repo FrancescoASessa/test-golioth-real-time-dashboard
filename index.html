@@ -201,7 +201,7 @@
 
       // Listen for telemetry updates
       socket.on('telemetry update', function(msg) {
-        var eventData = msg.HUBWATER_EVENT;
+        var eventData = msg.data.HUBWATER_EVENT;
 
         var flowMeterCount = parseFloat(eventData.STAT.FLOW_METER_COUNT);
         var liters = flowMeterCount / 695;
